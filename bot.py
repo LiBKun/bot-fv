@@ -262,5 +262,5 @@ def conecta_bd():
     except Exception as e:
         print(f"Erro ao conectar {e}")
 
-
+bot.remove_webhook()
 bot.infinity_polling()
