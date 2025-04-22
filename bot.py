@@ -1,6 +1,6 @@
 import telebot
 from telebot import types
-from conexao import extrair_cd_localembarque, consulta_clifor, extrai_cidades_rota
+from conexao import extrair_cd_localembarque, consulta_clifor, extrai_cidades_rota,extrai_transportadoras
 import psycopg2
 import fitz
 
@@ -52,8 +52,21 @@ def contrato(mensagem,contrato):
     except:
         bot.send_message(mensagem.chat.id,str("Nenhuma ordem ativa para o contrato "+contrato))
         faturar(mensagem)
-def romaneio(mensagem): 
+def transportadora(mensagem):
     limpa_dados(7)
+    bot.send_message(mensagem.chat.id,"Selecione a transportadora")
+    try:
+        for linhas in extrai_transportadoras(dados[4]):
+            print(linhas)
+            markup = types.InlineKeyboardMarkup()
+            botao_selecionar = types.InlineKeyboardButton("Selecionar", callback_data=str("sel2="+str(linhas))) # CRIA O BOTÃO COM O NMR_ORDEM E O CD_ORIGEM
+            markup.add(botao_selecionar)
+            bot.reply_to(mensagem, str(linhas),reply_markup=markup)
+    except:
+        bot.send_message(mensagem.chat.id,str("Nenhuma transportadora ativa para o contrato "+dados[4]))
+        faturar(mensagem)
+def romaneio(mensagem): 
+    limpa_dados(9)
     texto = "Informe o Peso Tara"
     bot.send_message(mensagem.chat.id, texto) # ENVIA A MENSAGEM TEXTO
     bot.register_next_step_handler(mensagem, peso_inicial) # REGISTRA A PROXIMA RESPOSTA
@@ -70,10 +83,10 @@ def confirma_peso(mensagem):
     texto = f"""
 O pesos informados são:
 
-Peso Tara: {dados[7]}
-Peso Bruto: {dados[8]}
+Peso Tara: {dados[8]}
+Peso Bruto: {dados[9]}
 
-Peso líquido: {int(dados[8])-int(dados[7])}
+Peso líquido: {int(dados[9])-int(dados[8])}
 
 Correto?
 """
@@ -157,7 +170,7 @@ def resposta_botao(call:types.CallbackQuery):
                 case '1':
                     contrato(call.message,call.data.split('=')[2])
                 case '2':
-                    romaneio(call.message)
+                    transportadora(call.message)
                 case '3':
                     peso_final(call.message)
                 case '4':
@@ -170,15 +183,16 @@ def resposta_botao(call:types.CallbackQuery):
                         "nr_contrato_venda":dados[4],
                         "rota":dados[5],
                         "ordem":dados[6],
-                        "peso_inicial":dados[7],
-                        "peso_final":dados[8],
-                        "classificador":dados[9]
+                        "transportadora":dados[7],
+                        "peso_inicial":dados[8],
+                        "peso_final":dados[9],
+                        "classificador":dados[10]
                     }
                     conn = None
                     try:
                         conn = conecta_bd()
                         with conn.cursor() as cursor:
-                            inserir = f"INSERT INTO dados_telegram (login, clifor, senha, contato, rota, nr_contrato_venda,ordem, peso_inicial, peso_final, classificador, status_ordem) VALUES ('{dados_bd['login']}','{dados_bd['clifor']}', '{dados_bd['senha']}', '{dados_bd['contato']}','{dados_bd['rota']}',{dados_bd['nr_contrato_venda']},{dados_bd['ordem']},'{dados_bd['peso_inicial']}','{dados_bd['peso_final']}', ARRAY{dados_bd['classificador']},{False});"
+                            inserir = f"INSERT INTO dados_telegram (login, clifor, senha, contato, rota, nr_contrato_venda,ordem,transportadora, peso_inicial, peso_final, classificador, status_ordem) VALUES ('{dados_bd['login']}','{dados_bd['clifor']}', '{dados_bd['senha']}', '{dados_bd['contato']}','{dados_bd['rota']}',{dados_bd['nr_contrato_venda']},{dados_bd['ordem']},'{dados_bd['transportadora']}','{dados_bd['peso_inicial']}','{dados_bd['peso_final']}', ARRAY{dados_bd['classificador']},{False});"
                             cursor.execute(inserir)
                             conn.commit()
                             bot.send_message(call.message.chat.id,"Dados enviados")
@@ -193,30 +207,10 @@ def resposta_botao(call:types.CallbackQuery):
             insere_dados(extrai_cidades_rota(call.data.split('=')[2],dados[4]),call.data.split('=')[1])
             print("sel - ",dados)
             confirma_local(call.message,call.data.split('=')[1])
-
-def extrair_texto_pdf(caminho_pdf):
-    doc = fitz.open(caminho_pdf)
-    texto = ""
-    for pagina in doc:
-        texto += pagina.get_text()
-    return texto
-@bot.message_handler(content_types=['document'])
-def recebe_pdf(message):
-    if message.document.mime_type == 'application/pdf':
-        file_info = bot.get_file(message.document.file_id)
-        file_url = f'https://api.telegram.org/file/bot{CHAVE_API}/{file_info.file_path}'
-        bot.send_message(message.chat.id, "Baixando o arquivo...")
-
-        file_name = "ordem_coleta.pdf"
-        with open(file_name, 'wb') as f:
-            f.write(bot.download_file(file_info.file_path))
-        
-        texto_extraido = extrair_texto_pdf(file_name)
-        bot.send_message(message.chat.id, f"Texto extraído:\n{texto_extraido[:1000]}")
-        texto_extraido_global = texto_extraido
-        print(texto_extraido_global)
-    else:
-        bot.send_message(message.chat.id, "Por favor, envie um arquivo PDF.")
+        case 'sel2':
+            insere_dados(call.data.split('=')[1])
+            print("sel - ",dados)
+            romaneio(call.message)
 
 def get_senha(usuario):
     conn = None
