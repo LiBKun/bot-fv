@@ -2,14 +2,23 @@ import telebot
 from telebot import types
 from conexao import extrair_cd_localembarque, consulta_clifor, extrai_cidades_rota,extrai_transportadoras
 import psycopg2
-import fitz
 
 CHAVE_API =  '7888764861:AAHIVmH1WRi2Ps2gDdNR02q4B0O2i43BFhY' # CONSEGUI VIA BOTFATHER
 bot = telebot.TeleBot(CHAVE_API) # INSTANCIA O BOT
 dados = [] # VARIÁVEL USADA PARA GUARDAR OS DADOS QUE SERÃO ENVIADOS AO BD
 
-@bot.message_handler(commands=['oi', 'faturar'])
+def envia_pdf(chat_id):
+    try:
+        caminho_pdf = 'teste.pdf'
+        with open(caminho_pdf, 'rb') as arquivo:
+            bot.send_document(chat_id, arquivo)
+    except Exception as e:
+        bot.send_message(chat_id, f'Erro ao enviar o PDF: {e}')
+    #APOS O ENVIO, O ARQUIVO É EXCLUÍDO
+
+@bot.message_handler(commands=['faturar'])
 def inicio(mensagem):
+    envia_pdf(mensagem.chat.id)
     global dados 
     dados = []
     texto = """
@@ -21,7 +30,8 @@ Favor informar o seu Login
     bot.register_next_step_handler(mensagem, login)
 def login(mensagem):
     senha_usuario = get_senha(mensagem.text)
-    if senha_usuario == 0:
+    print(senha_usuario)
+    if senha_usuario == None:
         bot.reply_to(mensagem, "Usuário não existe")
         inicio(mensagem)
     else:
